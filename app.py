@@ -19,9 +19,10 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 RECIPIENT = "thakuraashik27@gmail.com"
+
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-UPLOAD_DIR = os.path.join(app.root_path, "static", "uploads")
+UPLOAD_DIR = "/tmp/uploads"
 CONTENT_FILE = os.path.join(app.root_path, "content.json")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -42,15 +43,17 @@ DEFAULT_CONTENT = {
 }
 
 def get_content():
-    if not os.path.exists(CONTENT_FILE):
-        with open(CONTENT_FILE, "w") as file:
-            json.dump(DEFAULT_CONTENT, file, indent=2)
-    with open(CONTENT_FILE) as file:
-        return json.load(file)
+    if os.path.exists(CONTENT_FILE):
+        with open(CONTENT_FILE) as file:
+            return json.load(file)
+    return DEFAULT_CONTENT
 
 def save_content(content):
-    with open(CONTENT_FILE, "w") as file:
-        json.dump(content, file, indent=2)
+    try:
+        with open(CONTENT_FILE, "w") as file:
+            json.dump(content, file, indent=2)
+    except OSError:
+        pass
 
 @app.get("/")
 def home():
@@ -110,9 +113,16 @@ def home():
     page = page.replace("</body>", "<style>.project-demo,.project-more{display:inline-flex!important;align-items:center;gap:8px;border-radius:999px;padding:10px 14px;font:700 11px Manrope,sans-serif;letter-spacing:.02em;transition:transform .25s,background .25s;color:#101114!important;-webkit-text-fill-color:#101114!important}.project-card a.project-demo{background:#fff!important;color:#000!important;-webkit-text-fill-color:#000!important;border:1px solid #fff!important;min-width:120px;justify-content:center;text-align:center}.project-card a.project-demo:hover{background:#fff!important;color:#000!important;-webkit-text-fill-color:#000!important;border-color:#fff!important;transform:translateY(-2px)}.project-more{background:#d7ff5f!important;border:1px solid #d7ff5f!important}.project-more:hover{background:#fff!important;border-color:#fff!important;transform:translateY(-2px)}.project-demo.disabled{background:transparent!important;color:#8c9098!important;border-color:#4a4d55!important;cursor:default}.project-card{min-height:480px!important;padding-bottom:30px!important}.project-card .arrow{position:static!important;display:flex;align-items:center;margin-top:18px}.project-card .project-demo{position:static!important}.project-card .project-more{position:static!important;align-self:flex-start;margin-top:10px}.project-card .project-more:hover{color:#101114!important}@media(max-width:800px){.project-card{min-height:430px!important}}</style></body>")
     return page
 
+# @app.get("/resume")
+# def resume():
+#     resume_image = next((name for name in os.listdir(UPLOAD_DIR) if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))), None)
+#     return render_template("resume.html", resume_image=resume_image)
+
 @app.get("/resume")
 def resume():
-    resume_image = next((name for name in os.listdir(UPLOAD_DIR) if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))), None)
+    resume_image = None
+    if os.path.exists(UPLOAD_DIR):
+        resume_image = next((name for name in os.listdir(UPLOAD_DIR) if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))), None)
     return render_template("resume.html", resume_image=resume_image)
 
 @app.get("/project/<int:index>")
@@ -225,4 +235,5 @@ def contact():
 
 if __name__ == "__main__":
     app.run(debug=os.getenv("FLASK_DEBUG", "0") == "1")
-    app=app
+
+app=app
