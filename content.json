@@ -1,0 +1,38 @@
+{
+  "skills": [
+    {
+      "title": "Data analysis",
+      "description": "Finding the signal in the noise and making insights actionable.",
+      "image": "https://media.licdn.com/dms/image/v2/D4D12AQFkbj5poAG2Ng/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1686213306356?e=2147483647&v=beta&t=YPobJWgCiXq26wk_HGloOLvt_2Fkdv_M7AClebbi21s"
+    },
+    {
+      "title": "Python",
+      "description": "Building clean, reliable workflows for data and automation.",
+      "image": "https://thebite.org/wp-content/uploads/2025/04/Python-1200x1200.webp"
+    },
+    {
+      "title": "SQL",
+      "description": "Querying, shaping, and understanding the story in databases.",
+      "image": "https://www.techmonitor.ai/wp-content/uploads/sites/29/2016/06/SQL.png"
+    },
+    {
+      "title": "NumPy + Pandas",
+      "description": "Exploring, cleaning, and transforming data with confidence.",
+      "image": "https://techietory.com/wp-content/uploads/2024/05/Featured-Images3-1.jpg"
+    },
+    {
+      "title": "Web development",
+      "description": "Crafting responsive digital experiences that feel considered.",
+      "image": "https://www.simplilearn.com/ice9/free_resources_article_thumb/is_web_development_good_career.jpg"
+    }
+  ],
+  "projects": [
+    {
+      "title": "World Hotel",
+      "description": "Experience an extraordinary blend of elegance, world-class hospitality, and modern convenience at World Hotel. Whether you are traveling for a corporate retreat, a weekend getaway, or an extended family vacation, our properties provide a sanctuary of peace and sophistication right in the heart of the city.",
+      "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3ZioEmF6R9tFcKPCzg8aVW8fpxo5sT3FmevXt8WbP1g&s=10",
+      "label": "Website Project",
+      "link": "https://24071256.tbcstudentserver.com/"
+    }
+  ]
+}
