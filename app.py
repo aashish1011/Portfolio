@@ -23,7 +23,7 @@ RECIPIENT = "thakuraashik27@gmail.com"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 UPLOAD_DIR = "/tmp/uploads"
-CONTENT_FILE = os.path.join(app.root_path, "content.json")
+CONTENT_FILE = "/tmp/content.json"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 DEFAULT_CONTENT = {
@@ -132,13 +132,32 @@ def project_detail(index):
         return redirect("/#projects")
     return render_template("project.html", project=projects[index])
 
+# @app.route("/admin", methods=["GET", "POST"])
+# def admin():
+#     if request.method == "POST":
+#         if ADMIN_USERNAME and ADMIN_PASSWORD and hmac.compare_digest(request.form.get("username", ""), ADMIN_USERNAME) and hmac.compare_digest(request.form.get("password", ""), ADMIN_PASSWORD):
+#             session["admin"] = True
+#             return redirect("/admin")
+#         return render_template("admin.html", error="Invalid admin credentials.")
+#     if not session.get("admin"):
+#         return render_template("admin.html", login=True)
+#     return render_template("admin.html", login=False, content=get_content())
+
+
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
-        if ADMIN_USERNAME and ADMIN_PASSWORD and hmac.compare_digest(request.form.get("username", ""), ADMIN_USERNAME) and hmac.compare_digest(request.form.get("password", ""), ADMIN_PASSWORD):
-            session["admin"] = True
-            return redirect("/admin")
+        username_input = request.form.get("username", "")
+        password_input = request.form.get("password", "")
+        
+        # Safely verify variables exist before checking HMAC
+        if ADMIN_USERNAME and ADMIN_PASSWORD:
+            if hmac.compare_digest(username_input, ADMIN_USERNAME) and hmac.compare_digest(password_input, ADMIN_PASSWORD):
+                session["admin"] = True
+                return redirect("/admin")
+                
         return render_template("admin.html", error="Invalid admin credentials.")
+        
     if not session.get("admin"):
         return render_template("admin.html", login=True)
     return render_template("admin.html", login=False, content=get_content())
