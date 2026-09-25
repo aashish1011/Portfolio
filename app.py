@@ -27,25 +27,17 @@ CONTENT_FILE = "/tmp/content.json"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 DEFAULT_CONTENT = {
-    "skills": [
-        {"title": "Data analysis", "description": "Finding the signal in the noise and making insights actionable.", "image": ""},
-        {"title": "Python", "description": "Building clean, reliable workflows for data and automation.", "image": ""},
-        {"title": "SQL", "description": "Querying, shaping, and understanding the story in databases.", "image": ""},
-        {"title": "NumPy + Pandas", "description": "Exploring, cleaning, and transforming data with confidence.", "image": ""},
-        {"title": "Web development", "description": "Crafting responsive digital experiences that feel considered.", "image": ""},
-        {"title": "Always learning", "description": "Growing a toolkit that keeps pace with better questions.", "image": ""},
-    ],
-    "projects": [
-        {"title": "[PROJECT NAME]", "description": "[PROJECT DESCRIPTION]", "label": "01 · PROJECT", "image": "", "link": ""},
-        {"title": "[PROJECT NAME]", "description": "[PROJECT DESCRIPTION]", "label": "02 · PROJECT", "image": "", "link": ""},
-        {"title": "[PROJECT NAME]", "description": "[PROJECT DESCRIPTION]", "label": "03 · PROJECT", "image": "", "link": ""},
-    ]
+    "skills": [],
+    "projects": []
 }
 
 def get_content():
     if os.path.exists(CONTENT_FILE):
-        with open(CONTENT_FILE) as file:
-            return json.load(file)
+        try:
+            with open(CONTENT_FILE, "r") as file:
+                return json.load(file)
+        except (json.JSONDecodeError, OSError):
+            return DEFAULT_CONTENT
     return DEFAULT_CONTENT
 
 def save_content(content):
