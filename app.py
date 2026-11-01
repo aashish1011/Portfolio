@@ -11,41 +11,79 @@ from flask import Flask, redirect, render_template, request, session
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 
+try:
+    from vercel.blob import sync as blob
+except ImportError:  # The Blob SDK is only required when cloud storage is configured.
+    blob = None
+
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+# Vercel Functions accept request bodies up to 4.5 MB. Leave room for the
+# multipart form wrapper so oversized uploads fail cleanly.
+app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024 + 256 * 1024
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 RECIPIENT = "thakuraashik27@gmail.com"
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-UPLOAD_DIR = "/tmp/uploads"
-CONTENT_FILE = "/tmp/content.json"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONTENT_FILE = os.path.join(BASE_DIR, "content.json")
+UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
+CONTENT_BLOB_PATH = "portfolio/content.json"
+BLOB_CONFIGURED = bool(
+    os.getenv("BLOB_READ_WRITE_TOKEN")
+    or (os.getenv("VERCEL_OIDC_TOKEN") and os.getenv("BLOB_STORE_ID"))
+)
+IS_VERCEL = bool(os.getenv("VERCEL"))
 
 DEFAULT_CONTENT = {
     "skills": [],
-    "projects": []
+    "projects": [],
+    "resume_image": "",
 }
 
+def get_local_content():
+    try:
+        with open(CONTENT_FILE, "r", encoding="utf-8") as file:
+            content = json.load(file)
+            content.setdefault("resume_image", "")
+            return content
+    except (json.JSONDecodeError, OSError):
+        return DEFAULT_CONTENT.copy()
+
 def get_content():
-    if os.path.exists(CONTENT_FILE):
+    if BLOB_CONFIGURED and blob is not None:
         try:
-            with open(CONTENT_FILE, "r") as file:
-                return json.load(file)
-        except (json.JSONDecodeError, OSError):
-            return DEFAULT_CONTENT
-    return DEFAULT_CONTENT
+            stored = blob.get_blob(CONTENT_BLOB_PATH, access="public")
+            content = json.loads(stored.body.decode("utf-8"))
+            content.setdefault("resume_image", "")
+            return content
+        except blob.BlobNotFoundError:
+            # The committed file seeds a newly connected Blob store.
+            return get_local_content()
+    return get_local_content()
 
 def save_content(content):
-    try:
-        with open(CONTENT_FILE, "w") as file:
-            json.dump(content, file, indent=2)
-    except OSError:
-        pass
+    payload = json.dumps(content, indent=2, ensure_ascii=False).encode("utf-8")
+    if BLOB_CONFIGURED and blob is not None:
+        blob.put_blob(
+            CONTENT_BLOB_PATH,
+            payload,
+            access="public",
+            content_type="application/json; charset=utf-8",
+            allow_overwrite=True,
+            cache_control_max_age=60,
+        )
+        return
+    if IS_VERCEL:
+        raise RuntimeError("Persistent storage is not configured. Connect a public Vercel Blob store.")
+    temporary_file = f"{CONTENT_FILE}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as file:
+        json.dump(content, file, indent=2, ensure_ascii=False)
+    os.replace(temporary_file, CONTENT_FILE)
 
 @app.get("/")
 def home():
@@ -112,10 +150,7 @@ def home():
 
 @app.get("/resume")
 def resume():
-    resume_image = None
-    if os.path.exists(UPLOAD_DIR):
-        resume_image = next((name for name in os.listdir(UPLOAD_DIR) if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))), None)
-    return render_template("resume.html", resume_image=resume_image)
+    return render_template("resume.html", resume_image=get_content().get("resume_image"))
 
 @app.get("/project/<int:index>")
 def project_detail(index):
@@ -201,10 +236,39 @@ def resume_upload():
     filename = secure_filename(file.filename)
     if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
         return "Only PNG, JPG, JPEG, and WEBP files are allowed.", 400
-    for old_file in os.listdir(UPLOAD_DIR):
-        if old_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-            os.remove(os.path.join(UPLOAD_DIR, old_file))
-    file.save(os.path.join(UPLOAD_DIR, filename))
+
+    content = get_content()
+    old_resume = content.get("resume_image", "")
+    if BLOB_CONFIGURED and blob is not None:
+        file.stream.seek(0, os.SEEK_END)
+        file_size = file.stream.tell()
+        file.stream.seek(0)
+        uploaded = blob.put_blob(
+            f"portfolio/resume/{filename}",
+            file.stream,
+            access="public",
+            content_length=file_size,
+            content_type=file.mimetype,
+            add_random_suffix=True,
+        )
+        content["resume_image"] = uploaded.url
+        save_content(content)
+        if old_resume and "blob.vercel-storage.com" in old_resume:
+            try:
+                blob.delete_blob(old_resume)
+            except blob.BlobError:
+                # The new resume is already live; stale-file cleanup can be retried later.
+                app.logger.warning("Could not delete the previous resume blob", exc_info=True)
+    elif IS_VERCEL:
+        return "Persistent storage is not configured. Connect a public Vercel Blob store first.", 503
+    else:
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        for old_file in os.listdir(UPLOAD_DIR):
+            if old_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                os.remove(os.path.join(UPLOAD_DIR, old_file))
+        file.save(os.path.join(UPLOAD_DIR, filename))
+        content["resume_image"] = f"/static/uploads/{filename}"
+        save_content(content)
     return redirect("/resume")
 
 @app.get("/admin/logout")
