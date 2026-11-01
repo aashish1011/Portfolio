@@ -35,9 +35,12 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 CONTENT_BLOB_PATH = "portfolio/content.json"
 BLOB_CONFIGURED = bool(
     os.getenv("BLOB_READ_WRITE_TOKEN")
+    or os.getenv("VERCEL_BLOB_READ_WRITE_TOKEN")
     or (os.getenv("VERCEL_OIDC_TOKEN") and os.getenv("BLOB_STORE_ID"))
 )
 IS_VERCEL = bool(os.getenv("VERCEL"))
+BLOB_ERRORS = (blob.BlobError,) if blob is not None else ()
+STORAGE_ERRORS = (RuntimeError, OSError, json.JSONDecodeError) + BLOB_ERRORS
 
 DEFAULT_CONTENT = {
     "skills": [],
@@ -64,6 +67,9 @@ def get_content():
         except blob.BlobNotFoundError:
             # The committed file seeds a newly connected Blob store.
             return get_local_content()
+        except BLOB_ERRORS:
+            app.logger.warning("Could not read portfolio content from Blob", exc_info=True)
+            return get_local_content()
     return get_local_content()
 
 def save_content(content):
@@ -84,6 +90,14 @@ def save_content(content):
     with open(temporary_file, "w", encoding="utf-8") as file:
         json.dump(content, file, indent=2, ensure_ascii=False)
     os.replace(temporary_file, CONTENT_FILE)
+
+def storage_error(error):
+    app.logger.error("Portfolio storage operation failed", exc_info=error)
+    return (
+        "Portfolio storage is unavailable. Verify that a public Vercel Blob "
+        "store is connected to this project, then redeploy.",
+        503,
+    )
 
 @app.get("/")
 def home():
@@ -193,37 +207,48 @@ def admin():
 def add_content(section):
     if not session.get("admin") or section not in ("skills", "projects"):
         return redirect("/admin")
-    content = get_content()
-    item = {"title": request.form.get("title", "").strip(), "description": request.form.get("description", "").strip(), "image": request.form.get("image", "").strip()}
-    if section == "projects":
-        item["label"] = request.form.get("label", "PROJECT · NEW").strip()
-        item["link"] = request.form.get("link", "").strip()
-    if item["title"]: content[section].append(item)
-    save_content(content)
+    try:
+        content = get_content()
+        item = {"title": request.form.get("title", "").strip(), "description": request.form.get("description", "").strip(), "image": request.form.get("image", "").strip()}
+        if section == "projects":
+            item["label"] = request.form.get("label", "PROJECT · NEW").strip()
+            item["link"] = request.form.get("link", "").strip()
+        if item["title"]:
+            content[section].append(item)
+        save_content(content)
+    except STORAGE_ERRORS as error:
+        return storage_error(error)
     return redirect("/admin")
 
 @app.post("/admin/content/<section>/<int:index>/delete")
 def delete_content(section, index):
     if not session.get("admin") or section not in ("skills", "projects"):
         return redirect("/admin")
-    content = get_content()
-    if 0 <= index < len(content[section]): content[section].pop(index)
-    save_content(content)
+    try:
+        content = get_content()
+        if 0 <= index < len(content[section]):
+            content[section].pop(index)
+        save_content(content)
+    except STORAGE_ERRORS as error:
+        return storage_error(error)
     return redirect("/admin")
 
 @app.post("/admin/content/<section>/<int:index>/edit")
 def edit_content(section, index):
     if not session.get("admin") or section not in ("skills", "projects"):
         return redirect("/admin")
-    content = get_content()
-    if 0 <= index < len(content[section]):
-        item = content[section][index]
-        item["title"] = request.form.get("title", item.get("title", "")).strip()
-        item["description"] = request.form.get("description", item.get("description", "")).strip()
-        item["image"] = request.form.get("image", item.get("image", "")).strip()
-        if section == "projects": item["label"] = request.form.get("label", item.get("label", "")).strip()
-        if section == "projects": item["link"] = request.form.get("link", item.get("link", "")).strip()
-        save_content(content)
+    try:
+        content = get_content()
+        if 0 <= index < len(content[section]):
+            item = content[section][index]
+            item["title"] = request.form.get("title", item.get("title", "")).strip()
+            item["description"] = request.form.get("description", item.get("description", "")).strip()
+            item["image"] = request.form.get("image", item.get("image", "")).strip()
+            if section == "projects": item["label"] = request.form.get("label", item.get("label", "")).strip()
+            if section == "projects": item["link"] = request.form.get("link", item.get("link", "")).strip()
+            save_content(content)
+    except STORAGE_ERRORS as error:
+        return storage_error(error)
     return redirect("/admin")
 
 @app.post("/admin/resume-upload")
@@ -234,41 +259,44 @@ def resume_upload():
     if not file or not file.filename:
         return redirect("/admin")
     filename = secure_filename(file.filename)
-    if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+    if not filename or not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
         return "Only PNG, JPG, JPEG, and WEBP files are allowed.", 400
 
-    content = get_content()
-    old_resume = content.get("resume_image", "")
-    if BLOB_CONFIGURED and blob is not None:
-        file.stream.seek(0, os.SEEK_END)
-        file_size = file.stream.tell()
-        file.stream.seek(0)
-        uploaded = blob.put_blob(
-            f"portfolio/resume/{filename}",
-            file.stream,
-            access="public",
-            content_length=file_size,
-            content_type=file.mimetype,
-            add_random_suffix=True,
-        )
-        content["resume_image"] = uploaded.url
-        save_content(content)
-        if old_resume and "blob.vercel-storage.com" in old_resume:
-            try:
-                blob.delete_blob(old_resume)
-            except blob.BlobError:
-                # The new resume is already live; stale-file cleanup can be retried later.
-                app.logger.warning("Could not delete the previous resume blob", exc_info=True)
-    elif IS_VERCEL:
-        return "Persistent storage is not configured. Connect a public Vercel Blob store first.", 503
-    else:
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        for old_file in os.listdir(UPLOAD_DIR):
-            if old_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-                os.remove(os.path.join(UPLOAD_DIR, old_file))
-        file.save(os.path.join(UPLOAD_DIR, filename))
-        content["resume_image"] = f"/static/uploads/{filename}"
-        save_content(content)
+    try:
+        content = get_content()
+        old_resume = content.get("resume_image", "")
+        if BLOB_CONFIGURED and blob is not None:
+            file.stream.seek(0, os.SEEK_END)
+            file_size = file.stream.tell()
+            file.stream.seek(0)
+            uploaded = blob.put_blob(
+                f"portfolio/resume/{filename}",
+                file.stream,
+                access="public",
+                content_length=file_size,
+                content_type=file.mimetype,
+                add_random_suffix=True,
+            )
+            content["resume_image"] = uploaded.url
+            save_content(content)
+            if old_resume and "blob.vercel-storage.com" in old_resume:
+                try:
+                    blob.delete_blob(old_resume)
+                except blob.BlobError:
+                    # The new resume is already live; stale-file cleanup can be retried later.
+                    app.logger.warning("Could not delete the previous resume blob", exc_info=True)
+        elif IS_VERCEL:
+            raise RuntimeError("A Vercel Blob store is not connected")
+        else:
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+            for old_file in os.listdir(UPLOAD_DIR):
+                if old_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                    os.remove(os.path.join(UPLOAD_DIR, old_file))
+            file.save(os.path.join(UPLOAD_DIR, filename))
+            content["resume_image"] = f"/static/uploads/{filename}"
+            save_content(content)
+    except STORAGE_ERRORS as error:
+        return storage_error(error)
     return redirect("/resume")
 
 @app.get("/admin/logout")
