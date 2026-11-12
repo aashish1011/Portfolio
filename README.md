@@ -2,7 +2,7 @@
 
 ## Persistent admin uploads on Vercel
 
-The admin dashboard stores its editable content and resume image in Vercel Blob. Before deploying:
+The admin dashboard stores its editable content and resume PDF in Vercel Blob. Before deploying:
 
 1. Open the project in Vercel and go to **Storage**.
 2. Create a **Blob** store with **Public** access and connect it to this project.

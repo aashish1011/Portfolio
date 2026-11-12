@@ -1,1 +1,23 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resume — Aashish Kumar Thakur</title><style>body{margin:0;background:#f4f3ef}img{display:block;width:100%;height:auto}.empty{min-height:100vh}</style></head><body>{% if resume_image %}<img src="{{ resume_image }}" alt="Aashish Kumar Thakur resume">{% else %}<div class="empty"></div>{% endif %}</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Resume — Aashish Kumar Thakur</title>
+    <style>
+        html, body { margin: 0; width: 100%; height: 100%; background: #f4f3ef; }
+        .resume-pdf { display: block; width: 100%; height: 100vh; border: 0; }
+        .empty { min-height: 100vh; }
+        .fallback { padding: 32px; font: 15px Arial, sans-serif; }
+    </style>
+</head>
+<body>
+    {% if resume_image %}
+    <object class="resume-pdf" data="{{ resume_image }}" type="application/pdf">
+        <p class="fallback">Your browser cannot display this PDF. <a href="{{ resume_image }}">Open the resume</a>.</p>
+    </object>
+    {% else %}
+    <div class="empty"></div>
+    {% endif %}
+</body>
+</html>

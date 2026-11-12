@@ -157,11 +157,6 @@ def home():
     page = page.replace("</body>", "<style>.project-demo,.project-more{display:inline-flex!important;align-items:center;gap:8px;border-radius:999px;padding:10px 14px;font:700 11px Manrope,sans-serif;letter-spacing:.02em;transition:transform .25s,background .25s;color:#101114!important;-webkit-text-fill-color:#101114!important}.project-card a.project-demo{background:#fff!important;color:#000!important;-webkit-text-fill-color:#000!important;border:1px solid #fff!important;min-width:120px;justify-content:center;text-align:center}.project-card a.project-demo:hover{background:#fff!important;color:#000!important;-webkit-text-fill-color:#000!important;border-color:#fff!important;transform:translateY(-2px)}.project-more{background:#d7ff5f!important;border:1px solid #d7ff5f!important}.project-more:hover{background:#fff!important;border-color:#fff!important;transform:translateY(-2px)}.project-demo.disabled{background:transparent!important;color:#8c9098!important;border-color:#4a4d55!important;cursor:default}.project-card{min-height:480px!important;padding-bottom:30px!important}.project-card .arrow{position:static!important;display:flex;align-items:center;margin-top:18px}.project-card .project-demo{position:static!important}.project-card .project-more{position:static!important;align-self:flex-start;margin-top:10px}.project-card .project-more:hover{color:#101114!important}@media(max-width:800px){.project-card{min-height:430px!important}}</style></body>")
     return page
 
-# @app.get("/resume")
-# def resume():
-#     resume_image = next((name for name in os.listdir(UPLOAD_DIR) if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))), None)
-#     return render_template("resume.html", resume_image=resume_image)
-
 @app.get("/resume")
 def resume():
     return render_template("resume.html", resume_image=get_content().get("resume_image"))
@@ -259,8 +254,11 @@ def resume_upload():
     if not file or not file.filename:
         return redirect("/admin")
     filename = secure_filename(file.filename)
-    if not filename or not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-        return "Only PNG, JPG, JPEG, and WEBP files are allowed.", 400
+    if not filename or not filename.lower().endswith(".pdf"):
+        return "Only PDF files are allowed.", 400
+    if file.stream.read(5) != b"%PDF-":
+        return "The uploaded file is not a valid PDF.", 400
+    file.stream.seek(0)
 
     try:
         content = get_content()
@@ -274,7 +272,7 @@ def resume_upload():
                 file.stream,
                 access="public",
                 content_length=file_size,
-                content_type=file.mimetype,
+                content_type="application/pdf",
                 add_random_suffix=True,
             )
             content["resume_image"] = uploaded.url
@@ -290,7 +288,7 @@ def resume_upload():
         else:
             os.makedirs(UPLOAD_DIR, exist_ok=True)
             for old_file in os.listdir(UPLOAD_DIR):
-                if old_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                if old_file.lower().endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp")):
                     os.remove(os.path.join(UPLOAD_DIR, old_file))
             file.save(os.path.join(UPLOAD_DIR, filename))
             content["resume_image"] = f"/static/uploads/{filename}"
