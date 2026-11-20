@@ -10,3 +10,7 @@ The admin dashboard stores its editable content and resume PDF in Vercel Blob. B
 4. Set a stable `SECRET_KEY` in the Vercel environment variables so admin sessions survive function restarts.
 
 For local development without Blob credentials, edits are saved to `content.json` and resume uploads to `static/uploads/`.
+
+## Portfolio chatbot
+
+The floating assistant on the portfolio, project, and resume pages uses the existing `chatbot.py` parser and Groq answer flow. Set `GROQ_API_KEY` in the Vercel project environment variables (and in a local `.env` file for development) before deploying. The assistant reads the current resume configured for `/resume`, including a resume uploaded to Vercel Blob. Upload a resume in the portfolio admin before using chat. The rest of the portfolio remains available if the key or resume is missing, while chat responds as temporarily unavailable.

@@ -1,0 +1,81 @@
+<!-- Portfolio chat opens from the existing Namaste robot greeting. -->
+<style>
+    .portfolio-chat{position:fixed;right:24px;top:142px;z-index:80;font-family:Manrope,Arial,sans-serif;color:#101114}
+    .portfolio-chat-toggle{display:none;border:1px solid #d9d8d2;background:#f4f3ef;color:#101114;border-radius:999px;padding:12px 16px;font:600 12px Manrope,Arial,sans-serif;cursor:pointer;box-shadow:0 8px 24px #10111418}
+    .portfolio-chat-panel{display:none;position:fixed;top:142px;right:24px;width:min(370px,calc(100vw - 32px));height:min(490px,calc(100vh - 165px));background:#f4f3ef;border:1px solid #d9d8d2;border-radius:14px;box-shadow:0 22px 55px #10111426;overflow:hidden;flex-direction:column}
+    .portfolio-chat-panel.open{display:flex}
+    .portfolio-chat-head{padding:17px 18px;background:#ebe9e2;border-bottom:1px solid #d9d8d2;display:flex;justify-content:space-between;align-items:center}
+    .portfolio-chat-head strong{font-size:15px;letter-spacing:-.03em}
+    .portfolio-chat-head small{display:block;color:#686b72;font:10px 'DM Mono',monospace;letter-spacing:.04em;margin-top:5px}
+    .portfolio-chat-close{width:30px;height:30px;background:transparent;border:1px solid #d1cfc7;border-radius:50%;color:#101114;font-size:19px;line-height:1;cursor:pointer}
+    .portfolio-chat-messages{flex:1;overflow-y:auto;padding:17px;display:flex;flex-direction:column;gap:11px}
+    .portfolio-chat-message{max-width:88%;white-space:pre-wrap;line-height:1.6;font-size:13px;padding:11px 13px;border-radius:12px;background:#fff;border:1px solid #e4e2dc;align-self:flex-start}
+    .portfolio-chat-message.user{background:#101114;color:#d7ff5f;border-color:#101114;align-self:flex-end}
+    .portfolio-chat-form{display:flex;gap:8px;padding:13px;border-top:1px solid #d9d8d2;background:#f4f3ef}
+    .portfolio-chat-form input{min-width:0;flex:1;background:#fff;color:#101114;border:1px solid #d9d8d2;border-radius:999px;padding:12px 14px;outline:none;font:13px Manrope,Arial,sans-serif}
+    .portfolio-chat-form input:focus{border-color:#101114}
+    .portfolio-chat-form button{border:0;border-radius:999px;background:#d7ff5f;color:#101114;padding:0 16px;font:700 12px Manrope,Arial,sans-serif;cursor:pointer}
+    .portfolio-chat-form button:disabled{opacity:.55;cursor:wait}
+    .robot-greeting{cursor:pointer!important;background:#f4f3ef!important;color:#101114!important;border:1px solid #d9d8d2!important;border-radius:10px!important;padding:9px 12px!important;font:600 11px Manrope,Arial,sans-serif!important;text-align:left;box-shadow:0 8px 20px #10111418!important}
+    .robot-greeting:after{background:#f4f3ef!important;border-color:#d9d8d2!important}
+    .robot-greeting small{display:block;margin-top:4px;color:#686b72;font:9px 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
+    .walkbot{pointer-events:auto!important;cursor:pointer}
+    .walkbot:focus-visible,.robot-greeting:focus-visible,.portfolio-chat-toggle:focus-visible{outline:2px solid #101114;outline-offset:4px}
+    @media(max-width:600px){.portfolio-chat{right:12px;top:138px}.portfolio-chat-panel{top:138px;right:12px;height:min(470px,calc(100dvh - 155px))}.robot-greeting{top:86px!important;right:62px!important;font-size:10px!important;padding:8px 10px!important}}
+</style>
+<aside class="portfolio-chat" aria-label="Ask Aashish about his work">
+    <section class="portfolio-chat-panel" id="portfolio-chat-panel" aria-label="Chat with Aashish">
+        <header class="portfolio-chat-head"><div><strong>Ask me about my work</strong><small>AASHISH KUMAR THAKUR · PORTFOLIO</small></div><button class="portfolio-chat-close" type="button" aria-label="Close chat">×</button></header>
+        <div class="portfolio-chat-messages" aria-live="polite"><div class="portfolio-chat-message">Namaste. Ask me about my experience, skills, or projects.</div></div>
+        <form class="portfolio-chat-form"><input name="question" placeholder="Write your question…" autocomplete="off" required><button type="submit">Send</button></form>
+    </section>
+    <button class="portfolio-chat-toggle" type="button" aria-expanded="false">Namaste · Chat with me ↗</button>
+</aside>
+<script>
+    // Reuse the small Namaste robot as the launcher; retain a quiet fallback on pages without it.
+    (()=>{
+        const root=document.querySelector('.portfolio-chat');
+        if(!root)return;
+        const panel=root.querySelector('.portfolio-chat-panel');
+        const fallback=root.querySelector('.portfolio-chat-toggle');
+        const greeting=document.querySelector('.robot-greeting');
+        const toggle=greeting||fallback;
+        const close=root.querySelector('.portfolio-chat-close');
+        const messages=root.querySelector('.portfolio-chat-messages');
+        const form=root.querySelector('.portfolio-chat-form');
+        const input=form.elements.question;
+        const setOpen=open=>{panel.classList.toggle('open',open);toggle.setAttribute('aria-expanded',String(open));if(open)input.focus();};
+        if(greeting){
+            const text=greeting.textContent.trim()||'Namaste';
+            greeting.textContent=text;
+            const hint=document.createElement('small');hint.textContent='Chat with me ↗';greeting.appendChild(hint);
+            greeting.setAttribute('role','button');greeting.setAttribute('tabindex','0');greeting.setAttribute('aria-label','Namaste. Chat with me.');
+        }else{
+            fallback.style.display='inline-flex';
+        }
+        toggle.addEventListener('click',()=>setOpen(!panel.classList.contains('open')));
+        toggle.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOpen(!panel.classList.contains('open'));}});
+        close.addEventListener('click',()=>setOpen(false));
+        const robot=document.querySelector('.walkbot');
+        if(robot){
+            robot.removeAttribute('aria-hidden');robot.setAttribute('role','button');robot.setAttribute('tabindex','0');robot.setAttribute('aria-label','Open chat with Aashish');
+            robot.addEventListener('click',()=>setOpen(!panel.classList.contains('open')));
+            robot.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOpen(!panel.classList.contains('open'));}});
+        }
+        const addMessage=(text,kind='')=>{const item=document.createElement('div');item.className=`portfolio-chat-message ${kind}`;item.textContent=text;messages.appendChild(item);messages.scrollTop=messages.scrollHeight;return item;};
+        form.addEventListener('submit',async event=>{
+            event.preventDefault();
+            const question=input.value.trim();
+            if(!question)return;
+            addMessage(question,'user');input.value='';
+            const pending=addMessage('One moment…');
+            const submit=form.querySelector('button');submit.disabled=true;
+            try{
+                const response=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question})});
+                const result=await response.json();
+                pending.textContent=response.ok?result.answer:(result.error||'The assistant is temporarily unavailable.');
+            }catch(error){pending.textContent='I could not connect right now. Please try again shortly.';}
+            finally{submit.disabled=false;messages.scrollTop=messages.scrollHeight;}
+        });
+    })();
+</script>

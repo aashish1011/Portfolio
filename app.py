@@ -4,12 +4,15 @@ import smtplib
 import re
 import secrets
 import hmac
+from io import BytesIO
+from urllib.request import urlopen
 from html import escape
 from email.utils import parseaddr
 from email.message import EmailMessage
-from flask import Flask, redirect, render_template, request, session
+from flask import Flask, jsonify, redirect, render_template, request, session
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+from pypdf import PdfReader
 
 try:
     from vercel.blob import sync as blob
@@ -99,6 +102,38 @@ def storage_error(error):
         503,
     )
 
+def get_active_resume_pdf():
+    # The chatbot must use the same resume shown on /resume, including the latest Vercel Blob upload.
+    resume_url = get_content().get("resume_image", "")
+    if not resume_url:
+        raise FileNotFoundError("Upload a resume in the portfolio resume section before using chat.")
+    if resume_url.startswith(("https://", "http://")):
+        with urlopen(resume_url, timeout=15) as response:
+            pdf_bytes = response.read(12 * 1024 * 1024 + 1)
+        if len(pdf_bytes) > 12 * 1024 * 1024:
+            raise ValueError("The active resume PDF is too large to process.")
+        return pdf_bytes
+
+    if resume_url.startswith("/static/"):
+        resume_path = os.path.join(BASE_DIR, resume_url.lstrip("/"))
+    else:
+        # Local uploads are resolved from the same resume setting used by the public resume page.
+        resume_path = os.path.join(BASE_DIR, resume_url)
+    resume_path = os.path.abspath(resume_path)
+    if os.path.commonpath((BASE_DIR, resume_path)) != BASE_DIR:
+        raise ValueError("The configured resume path is invalid.")
+    with open(resume_path, "rb") as resume_file:
+        return resume_file.read(12 * 1024 * 1024 + 1)
+
+def extract_resume_text(pdf_bytes):
+    # Keep chatbot.py unchanged by adapting the active resume bytes to its existing text parsing flow here.
+    reader = PdfReader(BytesIO(pdf_bytes))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+def with_chat_widget(page):
+    # Render the same assistant on every public portfolio page.
+    return page.replace("</body>", render_template("chatbot.html") + "</body>")
+
 @app.get("/")
 def home():
     session["contact_csrf"] = secrets.token_urlsafe(32)
@@ -155,18 +190,43 @@ def home():
     page = page.replace("</body>", "<script>document.querySelectorAll('.visual').forEach(visual=>{const fallback=\"url('/static/images/ai.jpg')\";const current=visual.style.backgroundImage;if(current){const probe=new Image();probe.onload=()=>{};probe.onerror=()=>{visual.style.backgroundImage=current.replace(/url\\((['\"]?)[^'\\\"]+\\1\\)/,fallback)};const match=current.match(/url\\((['\"]?)([^'\\\"]+)\\1\\)/);if(match)probe.src=match[2]}else{visual.style.backgroundImage=fallback}});</script></body>")
     page = page.replace("</body>", "<style>.hero{overflow:visible}.hero .actions{position:relative;z-index:2}.hero .scroll{left:0;bottom:28px;z-index:1}@media(max-width:800px){.hero .scroll{display:block!important;position:static!important;writing-mode:horizontal-tb!important;margin-top:28px;font:10px 'DM Mono';color:#686b72}.hero .actions{flex-wrap:wrap;gap:10px;transform:translateX(-8px)}.hero .actions .btn{white-space:nowrap}}</style></body>")
     page = page.replace("</body>", "<style>.project-demo,.project-more{display:inline-flex!important;align-items:center;gap:8px;border-radius:999px;padding:10px 14px;font:700 11px Manrope,sans-serif;letter-spacing:.02em;transition:transform .25s,background .25s;color:#101114!important;-webkit-text-fill-color:#101114!important}.project-card a.project-demo{background:#fff!important;color:#000!important;-webkit-text-fill-color:#000!important;border:1px solid #fff!important;min-width:120px;justify-content:center;text-align:center}.project-card a.project-demo:hover{background:#fff!important;color:#000!important;-webkit-text-fill-color:#000!important;border-color:#fff!important;transform:translateY(-2px)}.project-more{background:#d7ff5f!important;border:1px solid #d7ff5f!important}.project-more:hover{background:#fff!important;border-color:#fff!important;transform:translateY(-2px)}.project-demo.disabled{background:transparent!important;color:#8c9098!important;border-color:#4a4d55!important;cursor:default}.project-card{min-height:480px!important;padding-bottom:30px!important}.project-card .arrow{position:static!important;display:flex;align-items:center;margin-top:18px}.project-card .project-demo{position:static!important}.project-card .project-more{position:static!important;align-self:flex-start;margin-top:10px}.project-card .project-more:hover{color:#101114!important}@media(max-width:800px){.project-card{min-height:430px!important}}</style></body>")
-    return page
+    # Keep the assistant available throughout the public portfolio, including the resume page.
+    return with_chat_widget(page)
 
 @app.get("/resume")
 def resume():
-    return render_template("resume.html", resume_image=get_content().get("resume_image"))
+    return with_chat_widget(render_template("resume.html", resume_image=get_content().get("resume_image")))
+
+@app.post("/chat")
+def portfolio_chat():
+    # Connect the existing chatbot backend to the portfolio while reusing its existing prompt and resume parser.
+    data = request.get_json(silent=True) or {}
+    question = data.get("question", "")
+    if not isinstance(question, str) or not question.strip():
+        return jsonify({"error": "Please enter a question."}), 400
+    if not os.getenv("GROQ_API_KEY"):
+        return jsonify({"error": "The assistant is temporarily unavailable."}), 503
+
+    try:
+        import chatbot
+
+        resume_text = extract_resume_text(get_active_resume_pdf())
+        parsed_resume = chatbot.parse_resume(resume_text)
+        answer = chatbot.ask_candidate(question.strip(), parsed_resume)
+        return jsonify({"answer": answer})
+    except FileNotFoundError:
+        # Tell visitors how to restore chat when no resume is configured in the resume section yet.
+        return jsonify({"error": "Please upload a resume in the portfolio admin before chatting."}), 503
+    except Exception:
+        app.logger.exception("Portfolio chatbot request failed")
+        return jsonify({"error": "I could not answer that right now. Please try again shortly."}), 503
 
 @app.get("/project/<int:index>")
 def project_detail(index):
     projects = get_content().get("projects", [])
     if index < 0 or index >= len(projects):
         return redirect("/#projects")
-    return render_template("project.html", project=projects[index])
+    return with_chat_widget(render_template("project.html", project=projects[index]))
 
 # @app.route("/admin", methods=["GET", "POST"])
 # def admin():
