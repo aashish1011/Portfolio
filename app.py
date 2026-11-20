@@ -128,7 +128,11 @@ def get_active_resume_pdf():
 def extract_resume_text(pdf_bytes):
     # Keep chatbot.py unchanged by adapting the active resume bytes to its existing text parsing flow here.
     reader = PdfReader(BytesIO(pdf_bytes))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+    resume_text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+    # Do not ask the resume parser to summarize an image-only PDF as if its contents were empty.
+    if not resume_text:
+        raise ValueError("The configured resume PDF has no extractable text. Upload a searchable or OCR-processed PDF.")
+    return resume_text
 
 def with_chat_widget(page):
     # Render the same assistant on every public portfolio page.
@@ -199,7 +203,7 @@ def resume():
 
 @app.post("/chat")
 def portfolio_chat():
-    # Connect the existing chatbot backend to the portfolio while reusing its existing prompt and resume parser.
+    # Pass the full active resume into the existing answer flow so intermediate parsing cannot drop facts.
     data = request.get_json(silent=True) or {}
     question = data.get("question", "")
     if not isinstance(question, str) or not question.strip():
@@ -211,12 +215,14 @@ def portfolio_chat():
         import chatbot
 
         resume_text = extract_resume_text(get_active_resume_pdf())
-        parsed_resume = chatbot.parse_resume(resume_text)
-        answer = chatbot.ask_candidate(question.strip(), parsed_resume)
+        answer = chatbot.ask_candidate(question.strip(), resume_text)
         return jsonify({"answer": answer})
     except FileNotFoundError:
         # Tell visitors how to restore chat when no resume is configured in the resume section yet.
         return jsonify({"error": "Please upload a resume in the portfolio admin before chatting."}), 503
+    except ValueError as error:
+        # Surface the specific PDF text-layer problem instead of returning an empty-resume answer.
+        return jsonify({"error": str(error)}), 503
     except Exception:
         app.logger.exception("Portfolio chatbot request failed")
         return jsonify({"error": "I could not answer that right now. Please try again shortly."}), 503
