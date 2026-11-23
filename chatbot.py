@@ -51,7 +51,7 @@ Rules:
 say
 "I don't have enough information to answer that."
 4. Be professional.
-5. Answer as if HR is interviewing this candidate.
+5. Answer as if HR is interviewing this candidate and try not to give the output too big.
 """
 
     response = client.chat.completions.create(
