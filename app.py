@@ -9,7 +9,7 @@ from urllib.request import urlopen
 from html import escape
 from email.utils import parseaddr
 from email.message import EmailMessage
-from flask import Flask, jsonify, redirect, render_template, request, session
+from flask import Flask, Response, jsonify, redirect, render_template, request, session
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from pypdf import PdfReader
@@ -215,8 +215,18 @@ def portfolio_chat():
         import chatbot
 
         resume_text = extract_resume_text(get_active_resume_pdf())
-        answer = chatbot.ask_candidate(question.strip(), resume_text)
-        return jsonify({"answer": answer})
+
+        def stream_answer():
+            try:
+                yield from chatbot.ask_candidate_stream(question.strip(), resume_text)
+            except Exception:
+                app.logger.exception("Portfolio chatbot stream failed")
+                yield "I could not answer that right now. Please try again shortly."
+
+        response = Response(stream_answer(), mimetype="text/plain; charset=utf-8")
+        response.headers["Cache-Control"] = "no-cache"
+        response.headers["X-Accel-Buffering"] = "no"
+        return response
     except FileNotFoundError:
         # Tell visitors how to restore chat when no resume is configured in the resume section yet.
         return jsonify({"error": "Please upload a resume in the portfolio admin before chatting."}), 503
