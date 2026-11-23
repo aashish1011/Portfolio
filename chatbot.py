@@ -70,11 +70,19 @@ say
                 "content":question
             }
 
-        ]
+        ],
+        stream=True
 
     )
 
-    return response.choices[0].message.content
+    answer = ""
+    for chunk in response:
+        content = chunk.choices[0].delta.content
+        if content:
+            print(content, end="", flush=True)
+            answer += content
+
+    return answer
 
 def parse_resume(resume_text):
     system_prompt = f"""
