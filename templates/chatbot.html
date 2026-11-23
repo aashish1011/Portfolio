@@ -22,8 +22,8 @@
     .portfolio-chat-message code{background:#ebe9e2;border-radius:4px;padding:1px 4px}
     .portfolio-chat-message.user{width:fit-content;max-width:88%;background:#101114;color:#d7ff5f;border-color:#101114;align-self:flex-end}
     .portfolio-chat-form{display:flex;gap:8px;padding:13px;border-top:1px solid #d9d8d2;background:#f4f3ef}
-    .portfolio-chat-form input{min-width:0;flex:1;background:#fff;color:#101114;border:1px solid #d9d8d2;border-radius:999px;padding:12px 14px;outline:none;font:13px Manrope,Arial,sans-serif}
-    .portfolio-chat-form input:focus{border-color:#101114}
+    .portfolio-chat-form textarea{min-width:0;flex:1;height:42px;max-height:120px;resize:none;overflow-y:auto;box-sizing:border-box;background:#fff;color:#101114;border:1px solid #d9d8d2;border-radius:21px;padding:11px 14px;outline:none;font:13px Manrope,Arial,sans-serif;line-height:18px}
+    .portfolio-chat-form textarea:focus{border-color:#101114}
     .portfolio-chat-form button{border:0;border-radius:999px;background:#d7ff5f;color:#101114;padding:0 16px;font:700 12px Manrope,Arial,sans-serif;cursor:pointer}
     .portfolio-chat-form button:disabled{opacity:.55;cursor:wait}
     .robot-greeting{cursor:pointer!important;background:#f4f3ef!important;color:#101114!important;border:1px solid #d9d8d2!important;border-radius:10px!important;padding:9px 12px!important;font:600 11px Manrope,Arial,sans-serif!important;text-align:left;box-shadow:0 8px 20px #10111418!important}
@@ -37,7 +37,7 @@
     <section class="portfolio-chat-panel" id="portfolio-chat-panel" aria-label="Chat with Aashish">
         <header class="portfolio-chat-head"><div><strong>Ask me about my work</strong><small>AASHISH KUMAR THAKUR · PORTFOLIO</small></div><button class="portfolio-chat-close" type="button" aria-label="Close chat">×</button></header>
         <div class="portfolio-chat-messages" aria-live="polite"><div class="portfolio-chat-message">Namaste. Ask me about my experience, skills, or projects.</div></div>
-        <form class="portfolio-chat-form"><input name="question" placeholder="Write your question…" autocomplete="off" required><button type="submit">Send</button></form>
+        <form class="portfolio-chat-form"><textarea name="question" placeholder="Write your question…" autocomplete="off" rows="1" required></textarea><button type="submit">Send</button></form>
     </section>
     <button class="portfolio-chat-toggle" type="button" aria-expanded="false">Namaste · Chat with me ↗</button>
 </aside>
@@ -55,6 +55,16 @@
         const form=root.querySelector('.portfolio-chat-form');
         const input=form.elements.question;
         const setOpen=open=>{panel.classList.toggle('open',open);toggle.setAttribute('aria-expanded',String(open));if(open)input.focus();};
+        input.addEventListener('input',()=>{
+            input.style.height='42px';
+            input.style.height=`${Math.min(input.scrollHeight,120)}px`;
+        });
+        input.addEventListener('keydown',event=>{
+            if(event.key==='Enter'&&!event.shiftKey){
+                event.preventDefault();
+                form.requestSubmit();
+            }
+        });
         const escapeHtml=value=>value.replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
         const formatInline=value=>{
             let html=escapeHtml(value);
@@ -140,7 +150,7 @@
             event.preventDefault();
             const question=input.value.trim();
             if(!question)return;
-            addMessage(question,'user');input.value='';
+            addMessage(question,'user');input.value='';input.style.height='42px';
             const pending=addMessage('One moment…');
             const submit=form.querySelector('button');submit.disabled=true;
             try{
