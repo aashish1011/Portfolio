@@ -1,13 +1,18 @@
-<!-- Portfolio chat opens from the existing Namaste robot greeting. -->
+<!-- Koda opens automatically and can also be launched from the Namaste robot greeting. -->
 <style>
+    body.portfolio-chat-open{position:fixed;left:0;right:0;width:100%;overflow:hidden}
     .portfolio-chat{position:fixed;right:24px;top:142px;z-index:80;font-family:Manrope,Arial,sans-serif;color:#101114}
     .portfolio-chat-toggle{display:none;border:1px solid #d9d8d2;background:#f4f3ef;color:#101114;border-radius:999px;padding:12px 16px;font:600 12px Manrope,Arial,sans-serif;cursor:pointer;box-shadow:0 8px 24px #10111418}
-    .portfolio-chat-panel{display:none;position:fixed;top:96px;right:24px;width:min(370px,calc(100vw - 32px));height:min(450px,calc(100vh - 120px));padding:0;background:#f4f3ef;border:1px solid #d9d8d2;border-radius:14px;box-shadow:0 22px 55px #10111426;overflow:hidden;flex-direction:column}
+    .portfolio-chat-backdrop{display:none;position:fixed;inset:0;background:#10111455;backdrop-filter:blur(2px)}
+    .portfolio-chat-backdrop.open{display:block}
+    .portfolio-chat-panel{display:none;position:fixed;left:50%;top:50%;z-index:81;transform:translate(-50%,-50%);width:min(520px,calc(100vw - 32px));height:min(540px,calc(100vh - 64px));padding:0;background:#f4f3ef;border:1px solid #d9d8d2;border-radius:14px;box-shadow:0 22px 55px #10111426;overflow:hidden;flex-direction:column}
     .portfolio-chat-panel.open{display:flex}
     .portfolio-chat-head{width:auto;max-width:none;height:auto;margin:0;padding:17px 18px;background:#ebe9e2;border-bottom:1px solid #d9d8d2;display:flex;justify-content:space-between;align-items:center}
     .portfolio-chat-head strong{font-size:15px;letter-spacing:-.03em}
     .portfolio-chat-head small{display:block;color:#686b72;font:10px 'DM Mono',monospace;letter-spacing:.04em;margin-top:5px}
-    .portfolio-chat-close{width:30px;height:30px;background:transparent;border:1px solid #d1cfc7;border-radius:50%;color:#101114;font-size:19px;line-height:1;cursor:pointer}
+    .portfolio-chat-close{width:30px;height:30px;background:transparent;border:1px solid #d1cfc7;border-radius:50%;color:#101114;font-size:19px;line-height:1;cursor:pointer;transition:background .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+    .portfolio-chat-close:hover,.portfolio-chat-close:focus-visible{background:#d7ff5f;border-color:#101114;transform:rotate(6deg) scale(1.08);box-shadow:0 5px 12px #10111420}
+    .portfolio-chat-close:focus-visible{outline:2px solid #101114;outline-offset:3px}
     .portfolio-chat-messages{flex:1;min-height:0;overflow-y:auto;padding:17px;display:flex;flex-direction:column;gap:11px}
     .portfolio-chat-message{width:88%;max-width:88%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;white-space:normal;line-height:1.6;font-size:13px;padding:11px 13px;border-radius:12px;background:#fff;border:1px solid #e4e2dc;align-self:flex-start}
     .portfolio-chat-message p{margin:0 0 8px}
@@ -31,12 +36,13 @@
     .robot-greeting small{display:block;margin-top:4px;color:#686b72;font:9px 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
     .walkbot{pointer-events:auto!important;cursor:pointer}
     .walkbot:focus-visible,.robot-greeting:focus-visible,.portfolio-chat-toggle:focus-visible{outline:2px solid #101114;outline-offset:4px}
-    @media(max-width:600px){.portfolio-chat{right:12px;top:138px}.portfolio-chat-panel{top:84px;right:12px;height:min(470px,calc(100dvh - 96px))}.robot-greeting{top:86px!important;right:62px!important;font-size:10px!important;padding:8px 10px!important}}
+    @media(max-width:600px){.portfolio-chat{right:12px;top:138px}.portfolio-chat-panel{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);height:min(540px,calc(100dvh - 32px));width:calc(100vw - 24px)}.robot-greeting{top:86px!important;right:62px!important;font-size:10px!important;padding:8px 10px!important}}
 </style>
-<aside class="portfolio-chat" aria-label="Ask Aashish about his work">
-    <section class="portfolio-chat-panel" id="portfolio-chat-panel" aria-label="Chat with Aashish">
-        <header class="portfolio-chat-head"><div><strong>Ask me about my work</strong><small>AASHISH KUMAR THAKUR · PORTFOLIO</small></div><button class="portfolio-chat-close" type="button" aria-label="Close chat">×</button></header>
-        <div class="portfolio-chat-messages" aria-live="polite"><div class="portfolio-chat-message">Namaste. Ask me about my experience, skills, or projects.</div></div>
+<aside class="portfolio-chat" aria-label="Ask Koda about Aashish's work">
+    <div class="portfolio-chat-backdrop" aria-hidden="true"></div>
+    <section class="portfolio-chat-panel" id="portfolio-chat-panel" aria-label="Chat with Koda">
+        <header class="portfolio-chat-head"><div><strong>Koda · Aashish's AI assistant</strong><small>AASHISH KUMAR THAKUR</small></div><button class="portfolio-chat-close" type="button" aria-label="Close chat">×</button></header>
+        <div class="portfolio-chat-messages" aria-live="polite"><div class="portfolio-chat-message">Namaste! I'm Koda, Aashish's AI assistant. Feel free to ask me anything about him.</div></div>
         <form class="portfolio-chat-form"><textarea name="question" placeholder="Write your question…" autocomplete="off" rows="1" required></textarea><button type="submit">Send</button></form>
     </section>
     <button class="portfolio-chat-toggle" type="button" aria-expanded="false">Namaste · Chat with me ↗</button>
@@ -47,6 +53,7 @@
         const root=document.querySelector('.portfolio-chat');
         if(!root)return;
         const panel=root.querySelector('.portfolio-chat-panel');
+        const backdrop=root.querySelector('.portfolio-chat-backdrop');
         const fallback=root.querySelector('.portfolio-chat-toggle');
         const greeting=document.querySelector('.robot-greeting');
         const toggle=greeting||fallback;
@@ -54,7 +61,23 @@
         const messages=root.querySelector('.portfolio-chat-messages');
         const form=root.querySelector('.portfolio-chat-form');
         const input=form.elements.question;
-        const setOpen=open=>{panel.classList.toggle('open',open);toggle.setAttribute('aria-expanded',String(open));if(open)input.focus();};
+        let savedScrollY=0;
+        const setOpen=open=>{
+            if(open&&!panel.classList.contains('open')){
+                savedScrollY=window.scrollY;
+                document.body.classList.add('portfolio-chat-open');
+                document.body.style.top=`-${savedScrollY}px`;
+            }
+            if(!open&&panel.classList.contains('open')){
+                document.body.classList.remove('portfolio-chat-open');
+                document.body.style.removeProperty('top');
+                window.scrollTo(0,savedScrollY);
+            }
+            panel.classList.toggle('open',open);
+            backdrop.classList.toggle('open',open);
+            toggle.setAttribute('aria-expanded',String(open));
+            if(open)input.focus();
+        };
         input.addEventListener('input',()=>{
             input.style.height='42px';
             input.style.height=`${Math.min(input.scrollHeight,120)}px`;
@@ -132,19 +155,22 @@
             const text=greeting.textContent.trim()||'Namaste';
             greeting.textContent=text;
             const hint=document.createElement('small');hint.textContent='Chat with me ↗';greeting.appendChild(hint);
-            greeting.setAttribute('role','button');greeting.setAttribute('tabindex','0');greeting.setAttribute('aria-label','Namaste. Chat with me.');
+            greeting.setAttribute('role','button');greeting.setAttribute('tabindex','0');greeting.setAttribute('aria-label','Namaste. Chat with Koda.');
         }else{
             fallback.style.display='inline-flex';
         }
         toggle.addEventListener('click',()=>setOpen(!panel.classList.contains('open')));
         toggle.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOpen(!panel.classList.contains('open'));}});
         close.addEventListener('click',()=>setOpen(false));
+        backdrop.addEventListener('click',()=>setOpen(false));
+        document.addEventListener('keydown',event=>{if(event.key==='Escape'&&panel.classList.contains('open'))setOpen(false);});
         const robot=document.querySelector('.walkbot');
         if(robot){
-            robot.removeAttribute('aria-hidden');robot.setAttribute('role','button');robot.setAttribute('tabindex','0');robot.setAttribute('aria-label','Open chat with Aashish');
+            robot.removeAttribute('aria-hidden');robot.setAttribute('role','button');robot.setAttribute('tabindex','0');robot.setAttribute('aria-label','Open chat with Koda');
             robot.addEventListener('click',()=>setOpen(!panel.classList.contains('open')));
             robot.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOpen(!panel.classList.contains('open'));}});
         }
+        requestAnimationFrame(()=>setOpen(true));
         const addMessage=(text,kind='')=>{const item=document.createElement('div');item.className=`portfolio-chat-message ${kind}`;item.textContent=text;messages.appendChild(item);messages.scrollTop=messages.scrollHeight;return item;};
         form.addEventListener('submit',async event=>{
             event.preventDefault();
